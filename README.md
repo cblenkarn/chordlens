@@ -12,6 +12,7 @@ Real-time MIDI chord recognition, grand staff notation, and practice drills in a
    git branch -M main
    git remote add origin git@github.com:YOUR_USERNAME/chordlens.git
    git push -u origin main
+   Good job
    ```
 
 2. **Import to Vercel**
