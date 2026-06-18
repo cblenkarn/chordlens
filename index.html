@@ -3051,11 +3051,14 @@ function renderStaff() {
   ctx.font = `${lineSpacing * 1.6}px serif`;
   ctx.fillStyle = '#6A6A72';
 
-  // Treble clef sharp/flat positions (staff line offsets from center)
-  const trebleSharpPositions = [-3, 0, -2.5, 0.5, -1.5, 1, -1]; // F C G D A E B (y offsets from treble center)
-  const trebleFlatPositions = [1, -1.5, 1.5, -1, 2, -0.5, 2.5]; // B E A D G C F
-  const bassSharpPositions = [-1.5, 1.5, -1, 2, 0.5, -2.5, 0]; // adjusted for bass
-  const bassFlatPositions = [2.5, 0, 3, 0.5, -2, 1, -1.5];
+  // Key-signature accidental positions, in half-line units from each clef's center
+  // (formula: y = center + position * lineSpacing / 2).
+  // Treble center = B4 middle line (0); top line F5 = -4, bottom line E4 = +4.
+  // Bass   center = D3 middle line (0); top line A3 = -4, bottom line G2 = +4.
+  const trebleSharpPositions = [-4, -1, -5, -2,  1, -3,  0]; // F# C# G# D# A# E# B#
+  const trebleFlatPositions  = [ 0, -3,  1, -2,  2, -1,  3]; // B♭ E♭ A♭ D♭ G♭ C♭ F♭
+  const bassSharpPositions   = [-2,  1, -3,  0,  3, -1,  2]; // F# C# G# D# A# E# B#
+  const bassFlatPositions    = [ 2, -1,  3,  0,  4,  1, -2]; // B♭ E♭ A♭ D♭ G♭ C♭ F♭
 
   let keySigWidth = 0;
   if (keySigNum > 0) {
