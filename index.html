@@ -828,14 +828,6 @@ html, body {
   transition: background 0.05s ease;
   z-index: 1;
 }
-.white-key.pressed {
-  background: var(--pressed-white);
-  border-color: var(--primary-dark);
-}
-.white-key.in-scale {
-  background: rgba(79,224,106,0.18);
-}
-.white-key.pressed.in-scale { background: var(--pressed-white); }
 .white-key .key-label {
   position: absolute;
   bottom: 6px;
@@ -846,7 +838,6 @@ html, body {
   pointer-events: none;
   font-weight: 500;
 }
-.white-key.pressed .key-label { color: #fff; }
 
 .black-key {
   position: absolute;
@@ -859,14 +850,6 @@ html, body {
   box-shadow: 0 3px 6px rgba(0,0,0,0.3);
   transition: background 0.05s ease;
 }
-.black-key.pressed {
-  background: var(--pressed-black);
-  box-shadow: 0 2px 4px rgba(0,0,0,0.4);
-}
-.black-key.in-scale {
-  background: rgba(79,224,106,0.50);
-}
-.black-key.pressed.in-scale { background: var(--pressed-black); }
 
 .clear-notes-btn {
   position: absolute;
@@ -925,25 +908,6 @@ html, body {
 .scale-staff-toggle:has(input:checked) {
   border-color: var(--primary);
   color: var(--primary);
-}
-
-.white-key.wrong-note {
-  background: rgba(255,59,76,0.25) !important;
-  border-color: #E57373 !important;
-  transition: background 0.3s;
-}
-.black-key.wrong-note {
-  background: var(--spectrum-red) !important;
-  transition: background 0.3s;
-}
-.white-key.correct-note {
-  background: #C8E6C9 !important;
-  border-color: var(--spectrum-green) !important;
-  transition: background 0.3s;
-}
-.black-key.correct-note {
-  background: var(--spectrum-green) !important;
-  transition: background 0.3s;
 }
 
 .sustain-indicator {
@@ -1684,15 +1648,21 @@ html, body {
   background: var(--surface);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  width: 210px;
-  min-width: 210px;
-  flex-shrink: 0;
+  flex: 7 1 0;
+  min-width: 0;
+  flex-shrink: 1;
   align-self: stretch;
   display: none;
   flex-direction: column;
   overflow: hidden;
 }
 .drill-ref-panel.show { display: flex; }
+.drill-panel-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
 .drill-panel-bar {
   display: flex;
   align-items: center;
@@ -1875,6 +1845,7 @@ html, body {
         <option value="circle-of-fifths">Circle of Fifths</option>
       </optgroup>
       <optgroup label="Drills">
+        <option value="scale-drill">Scale Drill</option>
         <option value="shell-voicing">Shell Voicings</option>
         <option value="two-five-one">ii–V–I Guide Tones</option>
         <option value="triad-circle">Triad Circle</option>
@@ -1896,6 +1867,13 @@ html, body {
       <option value="piano" selected>Piano</option>
       <option value="user">Rainbow</option>
       <option value="scale">Scale</option>
+    </select>
+    <select class="led-mode-select" id="chordAnchorSelect" title="Where drills center highlighted chords/scales — match this to your keyboard's octave range">
+      <option value="24">Drill range: C1</option>
+      <option value="36" selected>Drill range: C2</option>
+      <option value="48">Drill range: C3</option>
+      <option value="60">Drill range: C4 (middle)</option>
+      <option value="auto">Drill range: Auto (follow my playing)</option>
     </select>
     <button class="request-midi-btn" id="requestMidiBtn" style="display:none;">Enable MIDI</button>
   </div>
@@ -2019,14 +1997,14 @@ html, body {
     <!-- DRILL REF PANEL: shows for Shell Voicing + ii–V–I drills; staff and CoF stay visible -->
     <div class="drill-ref-panel" id="drillRefPanel">
       <div class="drill-panel-bar">
-        <button class="drill-nav-btn" id="drillPanelClose">✕</button>
+        <button class="drill-nav-btn" id="drillPanelClose" title="Close">✕</button>
         <button class="drill-nav-btn" id="drillPanelBack" title="Previous step">‹</button>
         <span class="drill-panel-title" id="drillPanelTitle"></span>
-        <select class="nt-select" id="drillPanelMode" style="display:none;font-size:11px;padding:3px 6px;"></select>
-        <div class="drill-panel-nav">
-          <button class="drill-nav-btn" id="drillPanelPrev">←</button>
+        <div class="drill-panel-controls" id="drillPanelControls"></div>
+        <div class="drill-panel-nav" id="drillPanelNavWrap">
+          <button class="drill-nav-btn" id="drillPanelPrev" title="Previous key">←</button>
           <span id="drillPanelKeyLabel" style="min-width:36px;text-align:center;">1/12</span>
-          <button class="drill-nav-btn" id="drillPanelNext">→</button>
+          <button class="drill-nav-btn" id="drillPanelNext" title="Next key">→</button>
         </div>
       </div>
       <div class="drill-panel-body" id="drillPanelBody"></div>
@@ -2191,145 +2169,10 @@ html, body {
 </div>
 
 <!-- NOTE TRAINER OVERLAY -->
-<div class="nt-overlay" id="noteTrainerOverlay">
-  <div class="nt-bar">
-    <button class="nt-bar-btn" id="ntClose">← Exit</button>
-    <button class="nt-bar-btn" id="ntBack" title="Previous note">‹</button>
-    <span class="nt-title">Note Trainer</span>
-    <button class="nt-bar-btn" id="ntSettingsBtn">⚙ Settings</button>
-  </div>
-  <div class="nt-settings" id="ntSettings">
-    <div class="nt-setting-group">
-      <span class="nt-setting-label">Clef</span>
-      <select class="nt-select" id="ntClefSel">
-        <option value="treble">Treble</option>
-        <option value="bass">Bass</option>
-        <option value="both">Both</option>
-      </select>
-    </div>
-    <div class="nt-setting-group">
-      <span class="nt-setting-label">Range</span>
-      <select class="nt-select" id="ntRangeSel">
-        <option value="0">Lines only</option>
-        <option value="1" selected>Lines + Spaces</option>
-        <option value="2">+1 Ledger line</option>
-        <option value="3">+2 Ledger lines</option>
-      </select>
-    </div>
-    <div class="nt-setting-group">
-      <span class="nt-setting-label">Accidentals</span>
-      <select class="nt-select" id="ntAccSel">
-        <option value="0" selected>Natural notes only</option>
-        <option value="1">Include sharps / flats</option>
-      </select>
-    </div>
-  </div>
-  <div class="nt-body">
-    <div class="nt-canvas-wrap" id="ntCanvasWrap">
-      <canvas id="ntCanvas"></canvas>
-    </div>
-    <div class="nt-hint-name" id="ntHintName">—</div>
-    <div class="nt-stats-row">
-      <span>Streak: <span class="nt-stat-streak" id="ntStreakVal">0</span></span>
-      <span>Accuracy: <span class="nt-stat-accuracy" id="ntAccuracyVal">—</span></span>
-    </div>
-    <div class="nt-actions">
-      <button class="nt-action-btn" id="ntHintBtn">Show Hint</button>
-      <button class="nt-action-btn" id="ntSkipBtn">Skip →</button>
-    </div>
-  </div>
-</div>
-
-<!-- TRIAD CIRCLE DRILL -->
-<div class="nt-overlay" id="tcdOverlay">
-  <div class="nt-bar">
-    <button class="nt-bar-btn" id="tcdClose">← Exit</button>
-    <button class="nt-bar-btn" id="tcdBack" title="Previous chord">‹</button>
-    <span class="nt-title">Triad Circle Drill</span>
-    <div style="display:flex;align-items:center;gap:8px;">
-      <span class="nt-setting-label">Mode</span>
-      <select class="nt-select" id="tcdMode">
-        <option value="major">Major</option>
-        <option value="minor">Minor</option>
-        <option value="both">Both</option>
-      </select>
-    </div>
-  </div>
-  <div class="nt-body">
-    <div class="tcd-progress-text" id="tcdProgress">1 / 12</div>
-    <div class="tcd-dots" id="tcdDots"></div>
-    <div class="tcd-chord-display">
-      <div class="tcd-chord-name" id="tcdChordName">C</div>
-      <div class="tcd-chord-quality" id="tcdChordQuality">major</div>
-    </div>
-    <div class="drill-notes" id="tcdNotes"></div>
-    <div class="tcd-hint">Hold any voicing of this chord to advance</div>
-  </div>
-</div>
-
-<!-- INVERSION DRILL -->
-<div class="nt-overlay" id="invOverlay">
-  <div class="nt-bar">
-    <button class="nt-bar-btn" id="invClose">← Exit</button>
-    <button class="nt-bar-btn" id="invBack" title="Previous step">‹</button>
-    <span class="nt-title">Inversion Drill</span>
-    <div style="display:flex;align-items:center;gap:8px;">
-      <span class="nt-setting-label">Mode</span>
-      <select class="nt-select" id="invMode">
-        <option value="major">Major</option>
-        <option value="minor">Minor</option>
-        <option value="both">Both</option>
-      </select>
-    </div>
-  </div>
-  <div class="nt-body">
-    <div class="tcd-progress-text" id="invProgressText">Key 1 / 12</div>
-    <div class="tcd-dots" id="invKeyDots"></div>
-    <div class="tcd-chord-display">
-      <div class="tcd-chord-name" id="invChordName">C</div>
-      <div class="tcd-chord-quality" id="invChordQuality">major</div>
-    </div>
-    <div class="drill-notes" id="invNotes"></div>
-    <div class="inv-steps" id="invSteps"></div>
-    <div class="tcd-hint" id="invBassHint">Lowest note: C</div>
-  </div>
-</div>
-
-<!-- VOICE LEADING DRILL -->
-<div class="nt-overlay" id="vlOverlay">
-  <div class="nt-bar">
-    <button class="nt-bar-btn" id="vlClose">← Exit</button>
-    <button class="nt-bar-btn" id="vlBack" title="Previous step">‹</button>
-    <span class="nt-title">Voice Leading</span>
-    <div style="display:flex;align-items:center;gap:8px;">
-      <span class="nt-setting-label">Start</span>
-      <select class="nt-select" id="vlStartKey">
-        <option value="C">C</option>
-        <option value="Db">D♭</option>
-        <option value="D">D</option>
-        <option value="all">All keys</option>
-      </select>
-    </div>
-  </div>
-  <div class="nt-body">
-    <div class="tcd-progress-text" id="vlProgress">Step 1 / 12</div>
-    <div class="tcd-dots" id="vlDots"></div>
-    <div class="vl-from-row">
-      <span id="vlFromLabel"></span>
-      <span class="vl-arrow" id="vlArrow"></span>
-    </div>
-    <div class="tcd-chord-display">
-      <div class="tcd-chord-name" id="vlChordName">C</div>
-      <div class="tcd-chord-quality" id="vlChordQuality">major</div>
-    </div>
-    <div class="drill-notes" id="vlNotes"></div>
-    <div class="inv-steps" id="vlInvPill"></div>
-    <div class="vl-hints">
-      <span class="tcd-hint" id="vlKeepHint"></span>
-      <span class="tcd-hint" id="vlBassHint">Lowest: C</span>
-    </div>
-  </div>
-</div>
+<!-- Note Trainer, Triad Circle, Inversion, and Voice Leading drills now render
+     inside the shared #drillRefPanel (see .staff-row above) instead of full-screen
+     overlays, so the grand staff and Circle of Fifths stay visible. Their body
+     markup is injected into #drillPanelBody by each drill's open*() function. -->
 
 <!-- ABOUT MODAL -->
 <div class="about-overlay" id="aboutOverlay">
@@ -2390,7 +2233,27 @@ const state = {
   pianoPreset: 'sf:acoustic_grand_piano',
   notationStyle: 'standard',
   audioStarted: false,
+  // Where drills (Inversion/Triad/Voice Leading chord targets, and the Scale
+  // Drill's walkthrough) center themselves — matters for small controllers,
+  // since a chord/scale anchored near middle C plus inversions/octave span
+  // can run off the top of a ~42-key keyboard. 'fixed' uses chordAnchorMidi
+  // (default C2); 'auto' follows the last note actually played instead.
+  chordAnchorMode: 'fixed',  // 'fixed' | 'auto'
+  chordAnchorMidi: 36,       // C2
+  lastPlayedNote: null,
 };
+
+// Base MIDI note that drill "target chord" voicings (Inversion, Triad Circle,
+// Voice Leading) and the Scale Drill's ascending/descending walkthrough are
+// built on top of. See state.chordAnchorMidi.
+function getChordAnchorBase() {
+  if (state.chordAnchorMode === 'auto' && state.lastPlayedNote != null) {
+    // Round down to the C at or below the last note played, so voicings sit
+    // right around wherever the player's hands already are.
+    return state.lastPlayedNote - (((state.lastPlayedNote % 12) + 12) % 12);
+  }
+  return state.chordAnchorMidi;
+}
 
 // ============================================================
 // === AUDIO ENGINE (Dual: SoundFont + Synth fallback) ===
@@ -3691,6 +3554,19 @@ function setupCofInteractions() {
       twoFiveOneDrillState.feedbackCorrect = false;
       renderTwoFiveOneDrill();
     }
+    // Scale Drill: clicking a ring picks the key position AND switches
+    // major/minor to match whichever ring was clicked (outer = major,
+    // inner = relative minor) — unless quality is "Both", which always
+    // shows the pair together regardless of which ring you click.
+    if (scaleDrillState.active) {
+      scaleDrillState.cofIndex = pos;
+      if (scaleDrillState.quality !== 'both') {
+        scaleDrillState.quality = (ring === 'outer') ? 'major' : 'minor';
+        const modeEl = document.getElementById('drillBarMode');
+        if (modeEl) modeEl.value = scaleDrillState.quality;
+      }
+      scaleDrillApply();
+    }
 
     renderCircleOfFifths();
     scheduleChordUpdate();
@@ -4271,6 +4147,7 @@ function scheduleChordUpdate() {
 
 function onNoteOn(note, velocity) {
   state.activeNotes.set(note, { velocity, timestamp: Date.now() });
+  state.lastPlayedNote = note;
   noteOn(note, velocity);
   // Run drill checks without early-returning — staff and chord panel always update
   if (noteTrainerState.active) ntHandleNoteOn(note);
@@ -4280,6 +4157,10 @@ function onNoteOn(note, velocity) {
   if (shellDrillState.active)      shellCheckNotes();
   if (twoFiveOneDrillState.active) twoFiveOneCheckNotes();
   if (scalePractice.active && scalePractice.staffMode) checkScaleNote(note);
+  // Which notes are physically held just changed — re-sync LED hints for
+  // whichever drill is active (see ledRefreshDrillTarget for why this can't
+  // just wait for the next successful match).
+  ledRefreshDrillTarget();
   updateKeyboardHighlights();
   scrollKeyboardToNotes();
   renderStaff();
@@ -4291,6 +4172,9 @@ function onNoteOn(note, velocity) {
 function onNoteOff(note) {
   state.activeNotes.delete(note);
   noteOff(note);
+  // Releasing a note frees it up to be re-lit as a hint again if it's still
+  // part of the current target — see ledRefreshDrillTarget.
+  ledRefreshDrillTarget();
   if (!state.sustainOn) {
     updateKeyboardHighlights();
   }
@@ -4309,6 +4193,7 @@ function onSustainChange(value) {
   document.getElementById('sustainIndicator').classList.toggle('active', state.sustainOn);
   if (!state.sustainOn) {
     releaseSustainedNotes();
+    ledRefreshDrillTarget();
     updateKeyboardHighlights();
     renderStaff();
     scheduleChordUpdate();
@@ -4705,6 +4590,71 @@ function roliUpdateHighlight() {
 }
 
 // ============================================================
+// === EXACT-NOTE KEY LIGHTING (plain MIDI, not ROLI SysEx) ===
+// Most RGB light-guide keyboards (ROLI Piano / Piano M / LUMI included) light
+// whichever key receives an incoming Note On, independent of the SysEx "scale"
+// system above. Note: ROLI's stock firmware officially only exposes a root
+// highlight + a whole-scale mask via SysEx — full per-note control isn't a
+// documented feature, so behavior sending raw Note On/Off for arbitrary notes
+// can vary.
+//
+// Critically: the SAME physical key can be lit two different ways — the
+// keyboard's own "physically pressed" state (when a finger is actually on it)
+// and our "virtual" hint state (from Note On/Off we send as MIDI output). If
+// the person holds a chord down (e.g. sustaining a "whole note") while we also
+// send our own Note Off/On for those same notes as part of a step transition,
+// the two states can stomp on each other and the lights get confused. So we
+// never touch (on or off) a note the app currently sees as actively held —
+// those are left entirely to the keyboard's native physically-pressed light.
+// We only manage notes the person ISN'T currently pressing.
+// ============================================================
+const ledLightState = { notes: [] };
+
+function ledSend(status, note, velocity) {
+  if (!state.selectedOutput) return;
+  if (note < 0 || note > 127) return;
+  try { state.selectedOutput.send([status, note, velocity]); } catch (e) { /* ignore */ }
+}
+
+function ledShowNotes(notes) {
+  if (!state.selectedOutput) return;
+  const next = Array.isArray(notes) ? notes : [];
+  const held = new Set(getAllActiveNotes()); // notes the person is physically pressing right now
+  // Turn off previously-lit notes, except ones still under the person's fingers —
+  // those stay lit via the keyboard's own physical-press state, untouched by us.
+  ledLightState.notes.forEach(n => { if (!held.has(n)) ledSend(0x80, n, 0); });
+  // Turn on newly-needed notes, except ones already held — no need to hint a key
+  // that's already being pressed, and doing so risks conflicting with its state.
+  next.forEach(n => { if (!held.has(n)) ledSend(0x90, n, 100); });
+  ledLightState.notes = next;
+}
+
+function ledClear() {
+  const held = new Set(getAllActiveNotes());
+  ledLightState.notes.forEach(n => { if (!held.has(n)) ledSend(0x80, n, 0); });
+  ledLightState.notes = [];
+}
+
+// ledShowNotes' held-note exclusion means the correct set of keys to light
+// depends on BOTH the target chord AND which notes are physically down right
+// now — and the latter changes on every keystroke, not just when the target
+// chord changes. Re-deriving and re-sending the current step's LED notes here
+// (called from onNoteOn/onNoteOff/sustain-release) keeps lighting in sync as
+// the player's hands move, instead of only refreshing on a successful match.
+function ledRefreshDrillTarget() {
+  if (invDrillState.active) {
+    const step = invDrillState.sequence[invDrillState.currentIndex];
+    if (step) ledShowNotes(computeChordMidiNotes(step.rootPC, step.qualityKey, step.inversionIndex));
+  } else if (triadDrillState.active) {
+    const step = triadDrillState.sequence[triadDrillState.currentIndex];
+    if (step) ledShowNotes(computeChordMidiNotes(step.rootPC, step.qualityKey, step.inversionIndex));
+  } else if (vlDrillState.active) {
+    const step = vlDrillState.sequence[vlDrillState.currentIndex];
+    if (step) ledShowNotes(computeChordMidiNotes(vlRootPC(step), 'maj', VL_INV_INDEX[step.inv] ?? 0));
+  }
+}
+
+// ============================================================
 // === SCALE PRACTICE ENGINE ===
 // ============================================================
 const SCALE_INTERVALS = {
@@ -4768,10 +4718,14 @@ function buildScaleSequence() {
 
   const { rootPC, intervals } = scale;
 
-  // Build ascending scale: one octave up from root in octave 4
+  // Build ascending scale: one octave up from root, anchored at the same
+  // configurable base the chord drills use (see getChordAnchorBase) — so
+  // the walkthrough (and the notes it draws on the grand staff, since
+  // renderStaff reads straight from scalePractice.sequence) shifts with the
+  // "Drill range" setting instead of always sitting at middle C.
   // Then descending back down (excluding the top note to avoid repeat)
   const ascending = [];
-  const baseNote = 60 + rootPC; // root in octave 4 (middle C area)
+  const baseNote = getChordAnchorBase() + rootPC;
   for (const interval of intervals) {
     ascending.push(baseNote + interval);
   }
@@ -4857,6 +4811,7 @@ function checkScaleNote(playedNote) {
       setTimeout(() => {
         resetScalePractice();
         renderStaff();
+        if (scaleDrillState.active) renderScaleDrillBar();
       }, 1200);
     }
   } else {
@@ -4871,18 +4826,35 @@ function checkScaleNote(playedNote) {
       if (scalePractice.statuses[idx] === 'wrong') {
         scalePractice.statuses[idx] = 'pending';
         renderStaff();
+        if (scaleDrillState.active) renderScaleDrillBar();
       }
     }, 500);
   }
 
   renderStaff();
+  if (scaleDrillState.active) renderScaleDrillBar();
 }
 
 function updateScaleOverlay() {
+  const scale = getActiveScale();
+  let inScalePCs = null, rootPC = null, altRootPC = null;
+  if (scale) {
+    inScalePCs = new Set(scale.intervals.map(iv => (scale.rootPC + iv) % 12));
+    rootPC = scale.rootPC;
+    // Scale Drill "Both" quality: also mark the paired relative root.
+    if (scaleDrillState.active && scaleDrillState.pairedRootPC != null) {
+      altRootPC = scaleDrillState.pairedRootPC;
+    }
+  }
   for (const [note, el] of keyElements) {
-    el.classList.remove('in-scale');
+    el.classList.remove('in-scale', 'scale-root', 'scale-root-alt');
     const existing = el.querySelector('.scale-degree-label');
     if (existing) existing.remove();
+    if (!inScalePCs) continue;
+    const pc = note % 12;
+    if (inScalePCs.has(pc)) el.classList.add('in-scale');
+    if (pc === rootPC) el.classList.add('scale-root');
+    else if (altRootPC != null && pc === altRootPC) el.classList.add('scale-root-alt');
   }
 }
 
@@ -4991,6 +4963,21 @@ function buildVoicing(rootPC, quality, inversion) {
   const treble = notes.slice(0); // all chord tones in treble
 
   return { bass: [bassNote], treble };
+}
+
+// Plain chord-tone MIDI notes (no doubled bass) for a given inversion, anchored
+// at getChordAnchorBase() (default C2) instead of a fixed middle-C. Used to
+// light the exact keys to press on a connected RGB keyboard.
+function computeChordMidiNotes(rootPC, quality, inversion) {
+  const intervals = QUALITY_PCS[quality] || [0, 4, 7];
+  const inv = Math.min(inversion || 0, intervals.length - 1);
+  const rootMidi = getChordAnchorBase() + rootPC;
+  let notes = intervals.map(i => rootMidi + i);
+  for (let i = 0; i < inv; i++) {
+    notes[i] += 12;
+  }
+  notes.sort((a, b) => a - b);
+  return notes;
 }
 
 const progState = {
@@ -6545,8 +6532,132 @@ function ntApplySettings() {
   if (noteTrainerState.active) ntNextNote();
 }
 
-function openNoteTrainer() {
+// ============================================================
+// === SHARED DRILL PANEL (Triad Circle, Inversion, Voice Leading, Note Trainer) ===
+// All four render inside the same #drillRefPanel, alongside the grand staff and
+// Circle of Fifths (see .staff-row), instead of a full-screen overlay — so nothing
+// overlaps and there's no separate "Exit" button beyond the panel's own small ✕.
+// ============================================================
+let _panelDrill = null; // 'triad' | 'inversion' | 'voiceleading' | 'notetrainer' | null
+
+function closeAllOtherDrills(except) {
   if (progState.active) closeProgression();
+  if (shellDrillState.active) closeShellDrill();
+  if (twoFiveOneDrillState.active) closeTwoFiveOneDrill();
+  if (scaleDrillState.active) closeScaleDrill();
+  if (except !== 'triad' && triadDrillState.active) closeTriadDrill();
+  if (except !== 'inversion' && invDrillState.active) closeInvDrill();
+  if (except !== 'voiceleading' && vlDrillState.active) closeVlDrill();
+  if (except !== 'notetrainer' && noteTrainerState.active) closeNoteTrainer();
+}
+
+// name: which drill owns the panel; title: bar label; bodyHTML: injected into
+// #drillPanelBody; opts.settingsPanelId: id of the <div class="nt-settings"> inside
+// bodyHTML (a matching "<id>Btn" gear button is created in the bar for it), if any;
+// opts.keyNav: whether to show the Prev/Next key-step controls in the bar.
+function openDrillPanel(name, title, bodyHTML, opts) {
+  opts = opts || {};
+  _panelDrill = name;
+  document.getElementById('drillPanelTitle').textContent = title;
+  document.getElementById('drillPanelBody').innerHTML = bodyHTML;
+  document.getElementById('drillPanelControls').innerHTML = opts.settingsPanelId
+    ? `<button class="nt-bar-btn" id="${opts.settingsPanelId}Btn">⚙ Settings</button>`
+    : '';
+  document.getElementById('drillPanelNavWrap').style.display = opts.keyNav ? '' : 'none';
+  document.getElementById('drillRefPanel').classList.add('show');
+}
+
+function closeDrillPanelIfOwner(name) {
+  if (_panelDrill !== name) return;
+  _panelDrill = null;
+  document.getElementById('drillRefPanel').classList.remove('show');
+  document.getElementById('drillPanelBody').innerHTML = '';
+  document.getElementById('drillPanelControls').innerHTML = '';
+}
+
+// Bar dispatch — Close / Back / Prev-key / Next-key act on whichever drill owns the panel
+function drillRefPanelClose() {
+  if (_panelDrill === 'triad') closeTriadDrill();
+  else if (_panelDrill === 'inversion') closeInvDrill();
+  else if (_panelDrill === 'voiceleading') closeVlDrill();
+  else if (_panelDrill === 'notetrainer') closeNoteTrainer();
+}
+function drillRefPanelBack() {
+  if (_panelDrill === 'triad') tcdGoBack();
+  else if (_panelDrill === 'inversion') invGoBack();
+  else if (_panelDrill === 'voiceleading') vlGoBack();
+  else if (_panelDrill === 'notetrainer') ntGoBack();
+}
+function drillRefPanelPrevKey() {
+  if (_panelDrill === 'triad') tcdPrevKey();
+  else if (_panelDrill === 'inversion') invPrevKey();
+}
+function drillRefPanelNextKey() {
+  if (_panelDrill === 'triad') tcdNextKey();
+  else if (_panelDrill === 'inversion') invNextKey();
+}
+
+// Sync the shared Circle of Fifths panel's coloring to whatever chord a drill is
+// currently practicing, so Tonic / IV·V / ii·iii·vi / vii° highlighting tracks along.
+// cofIndex: circle-of-fifths position (0-11) to treat as the highlighted key.
+// mode: 'major' | 'minor' — which ring/branch of the diatonic map to use.
+function drillSyncCofHighlight(cofIndex, mode) {
+  const keySig = COF_KEYSIG_BY_POS[cofIndex];
+  let changed = false;
+  if (keySig && keySig !== state.keySig) { state.keySig = keySig; changed = true; }
+  if (mode && mode !== state.keyMode) { state.keyMode = mode; changed = true; }
+  if (changed) {
+    const el = document.getElementById('keySigSelect');
+    if (el) el.value = state.keySig;
+    renderCircleOfFifths();
+  }
+}
+
+const NT_BODY_TEMPLATE = `
+  <div class="nt-settings" id="ntSettings">
+    <div class="nt-setting-group">
+      <span class="nt-setting-label">Clef</span>
+      <select class="nt-select" id="ntClefSel">
+        <option value="treble">Treble</option>
+        <option value="bass">Bass</option>
+        <option value="both">Both</option>
+      </select>
+    </div>
+    <div class="nt-setting-group">
+      <span class="nt-setting-label">Range</span>
+      <select class="nt-select" id="ntRangeSel">
+        <option value="0">Lines only</option>
+        <option value="1" selected>Lines + Spaces</option>
+        <option value="2">+1 Ledger line</option>
+        <option value="3">+2 Ledger lines</option>
+      </select>
+    </div>
+    <div class="nt-setting-group">
+      <span class="nt-setting-label">Accidentals</span>
+      <select class="nt-select" id="ntAccSel">
+        <option value="0" selected>Natural notes only</option>
+        <option value="1">Include sharps / flats</option>
+      </select>
+    </div>
+  </div>
+  <div class="nt-body">
+    <div class="nt-canvas-wrap" id="ntCanvasWrap">
+      <canvas id="ntCanvas"></canvas>
+    </div>
+    <div class="nt-hint-name" id="ntHintName">—</div>
+    <div class="nt-stats-row">
+      <span>Streak: <span class="nt-stat-streak" id="ntStreakVal">0</span></span>
+      <span>Accuracy: <span class="nt-stat-accuracy" id="ntAccuracyVal">—</span></span>
+    </div>
+    <div class="nt-actions">
+      <button class="nt-action-btn" id="ntHintBtn">Show Hint</button>
+      <button class="nt-action-btn" id="ntSkipBtn">Skip →</button>
+    </div>
+  </div>
+`;
+
+function openNoteTrainer() {
+  closeAllOtherDrills('notetrainer');
   noteTrainerState.active = true;
   noteTrainerState.targetMidi = null;
   noteTrainerState.feedbackTimer = null;
@@ -6555,8 +6666,10 @@ function openNoteTrainer() {
   noteTrainerState.correct = 0;
   noteTrainerState.total = 0;
   noteTrainerState.weights.clear();
-  positionDrillOverlay('noteTrainerOverlay');
-  document.getElementById('noteTrainerOverlay').classList.add('show');
+  openDrillPanel('notetrainer', 'NOTE TRAINER', NT_BODY_TEMPLATE, { settingsPanelId: 'ntSettings', keyNav: false });
+  document.getElementById('ntClefSel').value = noteTrainerState.settings.clef;
+  document.getElementById('ntRangeSel').value = String(noteTrainerState.settings.range);
+  document.getElementById('ntAccSel').value = String(noteTrainerState.settings.accidentals);
   ntUpdateStats();
   setTimeout(() => ntNextNote(), 80);
 }
@@ -6567,12 +6680,10 @@ function closeNoteTrainer() {
     clearTimeout(noteTrainerState.feedbackTimer);
     noteTrainerState.feedbackTimer = null;
   }
-  document.getElementById('noteTrainerOverlay').classList.remove('show');
-  document.getElementById('ntSettingsBtn').classList.remove('active');
-  document.getElementById('ntSettings').classList.remove('show');
-  restoreCofFromDrill();
+  closeDrillPanelIfOwner('notetrainer');
   document.getElementById('progSelectHeader').value = '';
 }
+
 
 // ============================================================
 // === TRIAD CIRCLE DRILL ===
@@ -6580,21 +6691,62 @@ function closeNoteTrainer() {
 const triadDrillState = {
   active: false,
   mode: 'major',      // 'major' | 'minor' | 'both'
+  inversion: 0,        // 0=root, 1=1st, 2=2nd — triads only have 3 positions
   sequence: [],       // [{name, quality, displayQuality, rootPC, pitchClasses}]
   currentIndex: 0,
   feedbackTimer: null,
   feedbackCorrect: false,
 };
 
-function buildTriadDrillSequence(mode) {
+const TCD_BODY_TEMPLATE = `
+  <div class="nt-settings" id="tcdSettings">
+    <div class="nt-setting-group">
+      <span class="nt-setting-label">Quality</span>
+      <select class="nt-select" id="tcdMode">
+        <option value="major">Major</option>
+        <option value="minor">Minor</option>
+        <option value="both">Both</option>
+      </select>
+    </div>
+    <div class="nt-setting-group">
+      <span class="nt-setting-label">Inversion</span>
+      <select class="nt-select" id="tcdInversion">
+        <option value="0">Root Position</option>
+        <option value="1">1st Inversion</option>
+        <option value="2">2nd Inversion</option>
+      </select>
+    </div>
+  </div>
+  <div class="nt-body">
+    <div class="tcd-progress-text" id="tcdProgress">1 / 12</div>
+    <div class="tcd-dots" id="tcdDots"></div>
+    <div class="tcd-chord-display">
+      <div class="tcd-chord-name" id="tcdChordName">C</div>
+      <div class="tcd-chord-quality" id="tcdChordQuality">major</div>
+    </div>
+    <div class="drill-notes" id="tcdNotes"></div>
+    <div class="tcd-hint" id="tcdBassHint">Lowest note: C</div>
+  </div>
+`;
+
+function buildTriadDrillSequence(mode, inversion) {
+  const inv = inversion || 0;
   const majorSeq = Array.from({length: 12}, (_, i) => {
     const pc = KEY_CYCLE[i];
     const nameArr = i <= 5 ? NOTE_NAMES_SHARP : NOTE_NAMES_FLAT;
-    const sortedPCs = [pc, (pc+4)%12, (pc+7)%12].sort((a,b)=>a-b);
+    const pcs = [pc, (pc+4)%12, (pc+7)%12]; // root, 3rd, 5th — in that order, for bass lookup
+    const bassPC = pcs[inv];
+    const sortedPCs = [...pcs].sort((a,b)=>a-b);
     return {
       name: COF_OUTER_LABELS[i],
       displayQuality: 'major',
-      pitchClasses: new Set([pc, (pc+4)%12, (pc+7)%12]),
+      cofIndex: i,          // circle-of-fifths position, used to sync the shared CoF panel
+      rootPC: pc,
+      qualityKey: 'maj',
+      inversionIndex: inv,
+      pitchClasses: new Set(pcs),
+      targetBassPC: bassPC,
+      bassName: nameArr[bassPC],
       sortedPCs,
       noteNames: sortedPCs.map(p => nameArr[p]),
     };
@@ -6602,11 +6754,19 @@ function buildTriadDrillSequence(mode) {
   const minorSeq = Array.from({length: 12}, (_, i) => {
     const pc = (KEY_CYCLE[i] + 9) % 12;
     const nameArr = i <= 5 ? NOTE_NAMES_SHARP : NOTE_NAMES_FLAT;
-    const sortedPCs = [pc, (pc+3)%12, (pc+7)%12].sort((a,b)=>a-b);
+    const pcs = [pc, (pc+3)%12, (pc+7)%12];
+    const bassPC = pcs[inv];
+    const sortedPCs = [...pcs].sort((a,b)=>a-b);
     return {
       name: COF_INNER_LABELS[i].replace(/m$/, ''),
       displayQuality: 'minor',
-      pitchClasses: new Set([pc, (pc+3)%12, (pc+7)%12]),
+      cofIndex: i,          // relative minor shares its major's circle-of-fifths position
+      rootPC: pc,
+      qualityKey: 'min',
+      inversionIndex: inv,
+      pitchClasses: new Set(pcs),
+      targetBassPC: bassPC,
+      bassName: nameArr[bassPC],
       sortedPCs,
       noteNames: sortedPCs.map(p => nameArr[p]),
     };
@@ -6617,15 +6777,15 @@ function buildTriadDrillSequence(mode) {
 }
 
 function openTriadDrill() {
-  if (progState.active) closeProgression();
-  if (noteTrainerState.active) closeNoteTrainer();
+  closeAllOtherDrills('triad');
   triadDrillState.active = true;
   triadDrillState.feedbackTimer = null;
   triadDrillState.feedbackCorrect = false;
   triadDrillState.currentIndex = 0;
-  triadDrillState.sequence = buildTriadDrillSequence(triadDrillState.mode);
-  positionDrillOverlay('tcdOverlay');
-  document.getElementById('tcdOverlay').classList.add('show');
+  triadDrillState.sequence = buildTriadDrillSequence(triadDrillState.mode, triadDrillState.inversion);
+  openDrillPanel('triad', 'TRIAD CIRCLE DRILL', TCD_BODY_TEMPLATE, { settingsPanelId: 'tcdSettings', keyNav: true });
+  document.getElementById('tcdMode').value = triadDrillState.mode;
+  document.getElementById('tcdInversion').value = String(triadDrillState.inversion);
   tcdUpdateUI();
 }
 
@@ -6635,8 +6795,8 @@ function closeTriadDrill() {
     clearTimeout(triadDrillState.feedbackTimer);
     triadDrillState.feedbackTimer = null;
   }
-  document.getElementById('tcdOverlay').classList.remove('show');
-  restoreCofFromDrill();
+  ledClear();
+  closeDrillPanelIfOwner('triad');
   document.getElementById('progSelectHeader').value = '';
 }
 
@@ -6645,42 +6805,74 @@ function closeTriadDrill() {
 // ============================================================
 const invDrillState = {
   active: false,
-  mode: 'major',    // 'major' | 'minor' | 'both'
-  sequence: [],     // flat array of steps (3 per key)
+  key: 'all',        // 'all' | 0-11 (pitch class of the root to focus on)
+  mode: 'major',     // 'major' | 'minor' | 'both'
+  chordType: 'triad', // 'triad' (root/1st/2nd) | 'seventh' (root/1st/2nd/3rd)
+  sequence: [],      // flat array of steps (3 or 4 per key/quality)
   currentIndex: 0,
   feedbackTimer: null,
   feedbackCorrect: false,
 };
 
-function buildInvDrillSequence(mode) {
-  const invLabels = ['Root Position', '1st Inversion', '2nd Inversion'];
-  const majorEntries = Array.from({length: 12}, (_, i) => ({
+function buildInvDrillSequence(mode, key, chordType) {
+  const isSeventh = chordType === 'seventh';
+  const invLabels = isSeventh
+    ? ['Root Position', '1st Inversion', '2nd Inversion', '3rd Inversion']
+    : ['Root Position', '1st Inversion', '2nd Inversion'];
+
+  // Bounce pattern of inversion indices for one key: up through every
+  // inversion, then back down to root (skipping the top/bottom endpoints on
+  // the way down so they aren't hit twice in a row) — e.g. triad:
+  // Root, 1st, 2nd, 1st. This loops in place on the same key rather than
+  // advancing to the next key once it completes (see invCheckNotes).
+  const ascendingPattern = Array.from({length: invLabels.length}, (_, i) => i);
+  const invPattern = [...ascendingPattern, ...ascendingPattern.slice(1, -1).reverse()];
+
+  // Either cycle through all 12 circle-of-fifths positions, or lock to one selected root.
+  const cofIndices = (key === 'all' || key === undefined || key === null)
+    ? Array.from({length: 12}, (_, i) => i)
+    : [KEY_CYCLE.indexOf(Number(key))];
+
+  const majorEntries = cofIndices.map(i => ({
     cofIndex: i,
+    spellCofIndex: i,
     chordName: COF_OUTER_LABELS[i],
     rootPC: KEY_CYCLE[i],
-    displayQuality: 'major',
-    intervals: [0, 4, 7],
+    displayQuality: isSeventh ? 'major 7th' : 'major',
+    qualityKey: isSeventh ? 'maj7' : 'maj',    // key into QUALITY_PCS, reused for LED voicing
+    intervals: isSeventh ? [0, 4, 7, 11] : [0, 4, 7],
   }));
-  const minorEntries = Array.from({length: 12}, (_, i) => ({
-    cofIndex: i,
-    chordName: COF_INNER_LABELS[i].replace(/m$/, ''),
-    rootPC: (KEY_CYCLE[i] + 9) % 12,
-    displayQuality: 'minor',
-    intervals: [0, 3, 7],
-  }));
+  const minorEntries = cofIndices.map(i => {
+    const rootPC = KEY_CYCLE[i];
+    // A minor key shares its key signature with its relative major (a minor 3rd up),
+    // so borrow that key's cofIndex to decide sharp vs. flat spelling (e.g. C minor → E♭ major → flats).
+    const relativeMajorPC = (rootPC + 3) % 12;
+    return {
+      cofIndex: i,
+      spellCofIndex: KEY_CYCLE.indexOf(relativeMajorPC),
+      chordName: COF_OUTER_LABELS[i],           // same root letter — parallel minor, not relative minor
+      rootPC,
+      displayQuality: isSeventh ? 'minor 7th' : 'minor',
+      qualityKey: isSeventh ? 'min7' : 'min',
+      intervals: isSeventh ? [0, 3, 7, 10] : [0, 3, 7],
+    };
+  });
 
   const entries = mode === 'major' ? majorEntries
                 : mode === 'minor' ? minorEntries
                 : [...majorEntries, ...minorEntries];
   const steps = [];
+  const entryStarts = [];
   entries.forEach((entry, entryIndex) => {
     // Sharp names for positions 0-5 (C G D A E B), flat for 6-11 (G♭ D♭ A♭ E♭ B♭ F)
-    const nameArr = entry.cofIndex <= 5 ? NOTE_NAMES_SHARP : NOTE_NAMES_FLAT;
+    const nameArr = entry.spellCofIndex <= 5 ? NOTE_NAMES_SHARP : NOTE_NAMES_FLAT;
     const pcs = entry.intervals.map(i => (entry.rootPC + i) % 12);
     const targetPCs = new Set(pcs);
     const sortedPCs = [...pcs].sort((a,b) => a-b);
     const noteNames = sortedPCs.map(p => nameArr[p]);
-    for (let inv = 0; inv < 3; inv++) {
+    const entryStart = steps.length;
+    entryStarts.push(entryStart);
+    invPattern.forEach(inv => {
       const bassPC = pcs[inv];
       steps.push({
         chordName: entry.chordName,
@@ -6688,6 +6880,7 @@ function buildInvDrillSequence(mode) {
         rootPC: entry.rootPC,
         inversionIndex: inv,
         inversionLabel: invLabels[inv],
+        totalInversions: invLabels.length,
         targetBassPC: bassPC,
         targetPCs,
         bassName: nameArr[bassPC],
@@ -6695,23 +6888,81 @@ function buildInvDrillSequence(mode) {
         noteNames,
         entryIndex,
         totalEntries: entries.length,
+        // Bounds of this key/quality's block within the flat sequence, so
+        // completing the pattern loops back to its own root instead of
+        // spilling into the next key, and Prev/Next can jump key-to-key.
+        entryStart,
+        entryLength: invPattern.length,
+        // qualityKey (not just a MIDI note list) so LED lighting can be
+        // recomputed at render time against whatever anchor is active now.
+        qualityKey: entry.qualityKey,
       });
-    }
+    });
   });
+  steps.entryStarts = entryStarts;
   return steps;
 }
 
+const INV_BODY_TEMPLATE = `
+  <div class="nt-settings" id="invSettings">
+    <div class="nt-setting-group">
+      <span class="nt-setting-label">Key</span>
+      <select class="nt-select" id="invKey">
+        <option value="all">All Keys</option>
+        <option value="0">C</option>
+        <option value="1">D♭</option>
+        <option value="2">D</option>
+        <option value="3">E♭</option>
+        <option value="4">E</option>
+        <option value="5">F</option>
+        <option value="6">G♭</option>
+        <option value="7">G</option>
+        <option value="8">A♭</option>
+        <option value="9">A</option>
+        <option value="10">B♭</option>
+        <option value="11">B</option>
+      </select>
+    </div>
+    <div class="nt-setting-group">
+      <span class="nt-setting-label">Quality</span>
+      <select class="nt-select" id="invMode">
+        <option value="major">Major</option>
+        <option value="minor">Minor</option>
+        <option value="both">Both</option>
+      </select>
+    </div>
+    <div class="nt-setting-group">
+      <span class="nt-setting-label">Chord</span>
+      <select class="nt-select" id="invChordType">
+        <option value="triad">Triad</option>
+        <option value="seventh">7th Chord</option>
+      </select>
+    </div>
+  </div>
+  <div class="nt-body">
+    <div class="tcd-progress-text" id="invProgressText">Key 1 / 12</div>
+    <div class="tcd-dots" id="invKeyDots"></div>
+    <div class="tcd-chord-display">
+      <div class="tcd-chord-name" id="invChordName">C</div>
+      <div class="tcd-chord-quality" id="invChordQuality">major</div>
+    </div>
+    <div class="drill-notes" id="invNotes"></div>
+    <div class="inv-steps" id="invSteps"></div>
+    <div class="tcd-hint" id="invBassHint">Lowest note: C</div>
+  </div>
+`;
+
 function openInvDrill() {
-  if (progState.active) closeProgression();
-  if (noteTrainerState.active) closeNoteTrainer();
-  if (triadDrillState.active) closeTriadDrill();
+  closeAllOtherDrills('inversion');
   invDrillState.active = true;
   invDrillState.feedbackTimer = null;
   invDrillState.feedbackCorrect = false;
   invDrillState.currentIndex = 0;
-  invDrillState.sequence = buildInvDrillSequence(invDrillState.mode);
-  positionDrillOverlay('invOverlay');
-  document.getElementById('invOverlay').classList.add('show');
+  invDrillState.sequence = buildInvDrillSequence(invDrillState.mode, invDrillState.key, invDrillState.chordType);
+  openDrillPanel('inversion', 'INVERSION DRILL', INV_BODY_TEMPLATE, { settingsPanelId: 'invSettings', keyNav: true });
+  document.getElementById('invKey').value = String(invDrillState.key);
+  document.getElementById('invMode').value = invDrillState.mode;
+  document.getElementById('invChordType').value = invDrillState.chordType;
   invUpdateUI();
 }
 
@@ -6721,16 +6972,37 @@ function closeInvDrill() {
     clearTimeout(invDrillState.feedbackTimer);
     invDrillState.feedbackTimer = null;
   }
-  document.getElementById('invOverlay').classList.remove('show');
-  restoreCofFromDrill();
+  ledClear();
+  closeDrillPanelIfOwner('inversion');
   document.getElementById('progSelectHeader').value = '';
+}
+
+function invPrevKey() {
+  const s = invDrillState;
+  if (s.sequence.length === 0) return;
+  if (s.feedbackTimer !== null) { clearTimeout(s.feedbackTimer); s.feedbackTimer = null; }
+  s.feedbackCorrect = false;
+  const step = s.sequence[s.currentIndex];
+  const prevEntryIndex = (step.entryIndex - 1 + step.totalEntries) % step.totalEntries;
+  s.currentIndex = s.sequence.entryStarts[prevEntryIndex];
+  invUpdateUI();
+}
+function invNextKey() {
+  const s = invDrillState;
+  if (s.sequence.length === 0) return;
+  if (s.feedbackTimer !== null) { clearTimeout(s.feedbackTimer); s.feedbackTimer = null; }
+  s.feedbackCorrect = false;
+  const step = s.sequence[s.currentIndex];
+  const nextEntryIndex = (step.entryIndex + 1) % step.totalEntries;
+  s.currentIndex = s.sequence.entryStarts[nextEntryIndex];
+  invUpdateUI();
 }
 
 function invCheckNotes() {
   if (!invDrillState.active || invDrillState.feedbackTimer !== null) return;
   const target = invDrillState.sequence[invDrillState.currentIndex];
   const held = getAllActiveNotes();
-  if (held.length < 3) return;
+  if (held.length < target.targetPCs.size) return;
 
   // All target pitch classes must be present
   const heldPCs = new Set(held.map(n => n % 12));
@@ -6747,9 +7019,11 @@ function invCheckNotes() {
     invDrillState.feedbackTimer = null;
     invDrillState.feedbackCorrect = false;
     invDrillState.currentIndex++;
-    if (invDrillState.currentIndex >= invDrillState.sequence.length) {
-      invDrillState.currentIndex = 0;
-      invDrillState.sequence = buildInvDrillSequence(invDrillState.mode);
+    // Completing the root→...→root bounce loops back to this same key/quality's
+    // root rather than spilling into the next key — advancing keys is a manual
+    // Prev/Next action only (see invPrevKey/invNextKey).
+    if (invDrillState.currentIndex >= target.entryStart + target.entryLength) {
+      invDrillState.currentIndex = target.entryStart;
     }
     invUpdateUI();
   }, 650);
@@ -6760,10 +7034,24 @@ function invUpdateUI() {
   if (!s.active || s.sequence.length === 0) return;
   const step = s.sequence[s.currentIndex];
 
-  document.getElementById('invProgressText').textContent =
-    `Key ${step.entryIndex + 1} / ${step.totalEntries}`;
+  const progressText = document.getElementById('invProgressText');
+  const dotsEl = document.getElementById('invKeyDots');
+  // When drilling a single locked key/quality there's nothing to page through —
+  // hide the multi-key progress chrome instead of showing a meaningless "1 / 1".
+  const showKeyProgress = step.totalEntries > 1;
+  progressText.style.display = showKeyProgress ? '' : 'none';
+  dotsEl.style.display = showKeyProgress ? '' : 'none';
+  if (showKeyProgress) {
+    progressText.textContent = `Key ${step.entryIndex + 1} / ${step.totalEntries}`;
+  }
   document.getElementById('invBassHint').textContent =
     `Lowest note: ${step.bassName}`;
+
+  // Mirror the same key progress into the shared bar's Prev/Next-key controls
+  const navWrap = document.getElementById('drillPanelNavWrap');
+  if (navWrap) navWrap.style.display = showKeyProgress ? '' : 'none';
+  const keyLabelEl = document.getElementById('drillPanelKeyLabel');
+  if (keyLabelEl && showKeyProgress) keyLabelEl.textContent = `${step.entryIndex + 1}/${step.totalEntries}`;
 
   const nameEl = document.getElementById('invChordName');
   const qualEl = document.getElementById('invChordQuality');
@@ -6774,11 +7062,11 @@ function invUpdateUI() {
 
   renderDrillNotes('invNotes', step.sortedPCs, step.noteNames, null, s.feedbackCorrect);
 
-  // Step pills: Root | 1st | 2nd
-  const pillLabels = ['Root', '1st', '2nd'];
+  // Step pills: Root | 1st | 2nd (triads) or Root | 1st | 2nd | 3rd (7th chords)
+  const pillLabels = ['Root', '1st', '2nd', '3rd'].slice(0, step.totalInversions);
   const stepsEl = document.getElementById('invSteps');
   stepsEl.innerHTML = '';
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < pillLabels.length; i++) {
     const pill = document.createElement('div');
     pill.className = 'inv-step-pill' +
       (i < step.inversionIndex ? ' done' : i === step.inversionIndex ? ' current' : '');
@@ -6787,7 +7075,6 @@ function invUpdateUI() {
   }
 
   // Key progress dots
-  const dotsEl = document.getElementById('invKeyDots');
   dotsEl.innerHTML = '';
   for (let i = 0; i < step.totalEntries; i++) {
     const dot = document.createElement('div');
@@ -6795,14 +7082,26 @@ function invUpdateUI() {
       (i < step.entryIndex ? ' done' : i === step.entryIndex ? ' current' : '');
     dotsEl.appendChild(dot);
   }
+
+  // Keep the shared Circle of Fifths panel's highlighting on the chord being practiced
+  drillSyncCofHighlight(step.spellCofIndex, step.displayQuality.includes('minor') ? 'minor' : 'major');
+
+  // Light the exact keys for this inversion on a connected RGB keyboard (no-op if none connected)
+  ledShowNotes(computeChordMidiNotes(step.rootPC, step.qualityKey, step.inversionIndex));
 }
 
 function tcdCheckNotes() {
   if (!triadDrillState.active || triadDrillState.feedbackTimer !== null) return;
   const target = triadDrillState.sequence[triadDrillState.currentIndex];
-  const heldPCs = new Set(getAllActiveNotes().map(n => n % 12));
+  const held = getAllActiveNotes();
+  if (held.length < target.pitchClasses.size) return;
+  const heldPCs = new Set(held.map(n => n % 12));
   const allMatch = [...target.pitchClasses].every(pc => heldPCs.has(pc));
   if (!allMatch) return;
+
+  // Lowest held note must match the required inversion's bass pitch class
+  const lowestNote = Math.min(...held);
+  if (lowestNote % 12 !== target.targetBassPC) return;
 
   // Correct — flash green then advance
   triadDrillState.feedbackCorrect = true;
@@ -6814,7 +7113,7 @@ function tcdCheckNotes() {
     if (triadDrillState.currentIndex >= triadDrillState.sequence.length) {
       // Full cycle complete — restart
       triadDrillState.currentIndex = 0;
-      triadDrillState.sequence = buildTriadDrillSequence(triadDrillState.mode);
+      triadDrillState.sequence = buildTriadDrillSequence(triadDrillState.mode, triadDrillState.inversion);
     }
     tcdUpdateUI();
   }, 650);
@@ -6838,6 +7137,9 @@ function tcdUpdateUI() {
 
   renderDrillNotes('tcdNotes', target.sortedPCs, target.noteNames, null, s.feedbackCorrect);
 
+  const bassHintEl = document.getElementById('tcdBassHint');
+  if (bassHintEl) bassHintEl.textContent = `Lowest note: ${target.bassName}`;
+
   // Progress dots
   const container = document.getElementById('tcdDots');
   container.innerHTML = '';
@@ -6847,6 +7149,33 @@ function tcdUpdateUI() {
       (i < idx ? ' done' : i === idx ? ' current' : '');
     container.appendChild(dot);
   }
+
+  // Mirror progress into the shared bar's Prev/Next-key controls
+  const keyLabelEl = document.getElementById('drillPanelKeyLabel');
+  if (keyLabelEl) keyLabelEl.textContent = `${idx + 1}/${total}`;
+
+  // Keep the shared Circle of Fifths panel's highlighting on the chord being practiced
+  drillSyncCofHighlight(target.cofIndex, target.displayQuality);
+
+  // Light the exact keys for this triad on a connected RGB keyboard (no-op if none connected)
+  ledShowNotes(computeChordMidiNotes(target.rootPC, target.qualityKey, target.inversionIndex));
+}
+
+function tcdPrevKey() {
+  const s = triadDrillState;
+  if (s.sequence.length === 0) return;
+  if (s.feedbackTimer !== null) { clearTimeout(s.feedbackTimer); s.feedbackTimer = null; }
+  s.feedbackCorrect = false;
+  s.currentIndex = (s.currentIndex - 1 + s.sequence.length) % s.sequence.length;
+  tcdUpdateUI();
+}
+function tcdNextKey() {
+  const s = triadDrillState;
+  if (s.sequence.length === 0) return;
+  if (s.feedbackTimer !== null) { clearTimeout(s.feedbackTimer); s.feedbackTimer = null; }
+  s.feedbackCorrect = false;
+  s.currentIndex = (s.currentIndex + 1) % s.sequence.length;
+  tcdUpdateUI();
 }
 
 // ============================================================
@@ -6908,6 +7237,9 @@ const vlDrillState = {
   feedbackCorrect: false,
 };
 
+// Inversion label -> computeChordMidiNotes' numeric inversion index.
+const VL_INV_INDEX = { 'Root Position': 0, '1st Inversion': 1, '2nd Inversion': 2 };
+
 function buildVlSequence(startKey) {
   const raw = startKey === 'all'
     ? [...VL_SEQ_DATA.C, ...VL_SEQ_DATA.Db, ...VL_SEQ_DATA.D]
@@ -6915,18 +7247,47 @@ function buildVlSequence(startKey) {
   return raw.map(s => ({ ...s, pcs: new Set(s.pcs) }));
 }
 
+const VL_BODY_TEMPLATE = `
+  <div class="nt-settings" id="vlSettings">
+    <div class="nt-setting-group">
+      <span class="nt-setting-label">Start</span>
+      <select class="nt-select" id="vlStartKey">
+        <option value="C">C</option>
+        <option value="Db">D♭</option>
+        <option value="D">D</option>
+        <option value="all">All keys</option>
+      </select>
+    </div>
+  </div>
+  <div class="nt-body">
+    <div class="tcd-progress-text" id="vlProgress">Step 1 / 12</div>
+    <div class="tcd-dots" id="vlDots"></div>
+    <div class="vl-from-row">
+      <span id="vlFromLabel"></span>
+      <span class="vl-arrow" id="vlArrow"></span>
+    </div>
+    <div class="tcd-chord-display">
+      <div class="tcd-chord-name" id="vlChordName">C</div>
+      <div class="tcd-chord-quality" id="vlChordQuality">major</div>
+    </div>
+    <div class="drill-notes" id="vlNotes"></div>
+    <div class="inv-steps" id="vlInvPill"></div>
+    <div class="vl-hints">
+      <span class="tcd-hint" id="vlKeepHint"></span>
+      <span class="tcd-hint" id="vlBassHint">Lowest: C</span>
+    </div>
+  </div>
+`;
+
 function openVlDrill() {
-  if (progState.active) closeProgression();
-  if (noteTrainerState.active) closeNoteTrainer();
-  if (triadDrillState.active) closeTriadDrill();
-  if (invDrillState.active) closeInvDrill();
+  closeAllOtherDrills('voiceleading');
   vlDrillState.active = true;
   vlDrillState.feedbackTimer = null;
   vlDrillState.feedbackCorrect = false;
   vlDrillState.currentIndex = 0;
   vlDrillState.sequence = buildVlSequence(vlDrillState.startKey);
-  positionDrillOverlay('vlOverlay');
-  document.getElementById('vlOverlay').classList.add('show');
+  openDrillPanel('voiceleading', 'VOICE LEADING', VL_BODY_TEMPLATE, { settingsPanelId: 'vlSettings', keyNav: false });
+  document.getElementById('vlStartKey').value = vlDrillState.startKey;
   vlUpdateUI();
 }
 
@@ -6936,9 +7297,17 @@ function closeVlDrill() {
     clearTimeout(vlDrillState.feedbackTimer);
     vlDrillState.feedbackTimer = null;
   }
-  document.getElementById('vlOverlay').classList.remove('show');
-  restoreCofFromDrill();
+  ledClear();
+  closeDrillPanelIfOwner('voiceleading');
   document.getElementById('progSelectHeader').value = '';
+}
+
+// All Voice Leading Drill chords are major triads — derive the root pitch class
+// from the bass pitch class + inversion label so we can sync the CoF highlight.
+function vlRootPC(step) {
+  if (step.inv === '1st Inversion') return (step.bassPC - 4 + 12) % 12;
+  if (step.inv === '2nd Inversion') return (step.bassPC - 7 + 12) % 12;
+  return step.bassPC; // Root Position
 }
 
 function vlCheckNotes() {
@@ -7026,6 +7395,12 @@ function vlUpdateUI() {
       (i < idx ? ' done' : i === idx ? ' current' : '');
     dotsEl.appendChild(dot);
   }
+
+  // Keep the shared Circle of Fifths panel's highlighting on the chord being practiced
+  drillSyncCofHighlight(COF_PC_TO_POS[vlRootPC(step)], 'major');
+
+  // Light the exact keys for this voicing on a connected RGB keyboard (no-op if none connected)
+  ledShowNotes(computeChordMidiNotes(vlRootPC(step), 'maj', VL_INV_INDEX[step.inv] ?? 0));
 }
 
 // ============================================================
@@ -7174,6 +7549,7 @@ function openShellDrill() {
   if (invDrillState.active) closeInvDrill();
   if (vlDrillState.active) closeVlDrill();
   if (twoFiveOneDrillState.active) closeTwoFiveOneDrill();
+  if (scaleDrillState.active) closeScaleDrill();
   shellDrillState.active = true;
   shellDrillState.currentIndex = 0;
   shellDrillState.feedbackTimer = null;
@@ -7302,6 +7678,7 @@ function openTwoFiveOneDrill() {
   if (invDrillState.active) closeInvDrill();
   if (vlDrillState.active) closeVlDrill();
   if (shellDrillState.active) closeShellDrill();
+  if (scaleDrillState.active) closeScaleDrill();
   twoFiveOneDrillState.active = true;
   twoFiveOneDrillState.currentIndex = 0;
   twoFiveOneDrillState.feedbackTimer = null;
@@ -7396,6 +7773,129 @@ function twoFiveOneGoBack() {
   renderTwoFiveOneDrill();
 }
 
+// ============================================================
+// === SCALE DRILL ===
+// Reuses the same top bar as Shell Voicings / ii–V–I (#drillBar) rather than
+// a separate reference panel, and depicts the scale directly on the grand
+// staff via the existing scale-practice engine (scaleRoot/scaleType/
+// scalePractice + renderStaff's "SCALE PRACTICE MODE" block) instead of
+// building a second notation renderer.
+//
+// Quality controls which root the scale — and the keyboard's "in-scale" tint
+// — is built on:
+//   Major → the Circle of Fifths outer-ring root for the current position.
+//   Minor → the inner-ring root, i.e. the RELATIVE minor (same key
+//           signature as the major — e.g. C major's position gives A minor),
+//           not the parallel minor.
+//   Both  → the shared note set (major and its relative minor share every
+//           note) with BOTH tonics marked — major root in white, the
+//           relative-minor root in amber — while the staff walkthrough and
+//           note-checking follow the major scale.
+// Clicking a CoF ring while this drill is active changes both which key
+// position is selected AND the Quality (outer ring → major, inner ring →
+// relative minor) — except when Quality is "Both", which always shows the
+// major/minor pair together regardless of which ring you click.
+// ============================================================
+const scaleDrillState = {
+  active: false,
+  cofIndex: 0,        // 0-11, circle-of-fifths position (shared key signature)
+  quality: 'major',   // 'major' | 'minor' | 'both'
+  pairedRootPC: null, // set when quality === 'both': relative-minor root's pitch class
+};
+
+// Recompute root/type from cofIndex + quality, drive the shared scale-practice
+// engine (staff walkthrough + keyboard overlay + ROLI LED), and refresh the
+// drill bar's key label / note-box row.
+function scaleDrillApply() {
+  const s = scaleDrillState;
+  const majorRootName = COF_SCALE_ROOT_BY_POS_MAJOR[s.cofIndex];
+  const minorRootName = COF_SCALE_ROOT_BY_POS_MINOR[s.cofIndex];
+  if (s.quality === 'minor') {
+    s.pairedRootPC = null;
+    applyScaleMode(minorRootName, 'natural_minor');
+    drillSyncCofHighlight(s.cofIndex, 'minor');
+  } else {
+    s.pairedRootPC = (s.quality === 'both') ? ROOT_NAME_TO_PC[minorRootName] : null;
+    applyScaleMode(majorRootName, 'major');
+    drillSyncCofHighlight(s.cofIndex, 'major');
+  }
+  document.getElementById('drillBarKeyLabel').textContent = `Key ${s.cofIndex + 1}/12`;
+  renderScaleDrillBar();
+}
+
+function openScaleDrill() {
+  closeAllOtherDrills();
+  scaleDrillState.active = true;
+  document.getElementById('drillBarLabel').textContent = 'SCALE DRILL';
+  const modeEl = document.getElementById('drillBarMode');
+  modeEl.innerHTML = '<option value="major">Major</option><option value="minor">Minor</option><option value="both">Both</option>';
+  modeEl.value = scaleDrillState.quality;
+  modeEl.style.display = '';
+  document.getElementById('drillBar').classList.add('show');
+  // Force the scale onto the grand staff for the duration of the drill,
+  // regardless of the standalone "Practice on staff" checkbox's prior state.
+  scalePractice.staffMode = true;
+  document.getElementById('scaleStaffMode').checked = true;
+  scaleDrillApply();
+}
+
+function closeScaleDrill() {
+  scaleDrillState.active = false;
+  scaleDrillState.pairedRootPC = null;
+  clearScaleMode();
+  scalePractice.staffMode = false;
+  document.getElementById('scaleStaffMode').checked = false;
+  document.getElementById('drillBar').classList.remove('show');
+  document.getElementById('drillBarMode').style.display = 'none';
+  document.getElementById('progSelectHeader').value = '';
+}
+
+function scaleDrillPrevKey() {
+  const s = scaleDrillState;
+  s.cofIndex = (s.cofIndex + 11) % 12;
+  scaleDrillApply();
+}
+function scaleDrillNextKey() {
+  const s = scaleDrillState;
+  s.cofIndex = (s.cofIndex + 1) % 12;
+  scaleDrillApply();
+}
+function scaleDrillGoBack() {
+  if (!scaleDrillState.active || scalePractice.currentIndex <= 0) return;
+  scalePractice.currentIndex--;
+  scalePractice.statuses[scalePractice.currentIndex] = 'pending';
+  renderStaff();
+  renderScaleDrillBar();
+}
+
+// Note-name boxes across the ascending+descending walkthrough — mirrors the
+// chord-box row Shell Voicings / ii–V–I use, so "played notes" progress reads
+// the same way across drills. Spelling (sharp vs. flat) follows the same
+// cofIndex convention as the rest of the app, since a relative major/minor
+// pair always shares one key signature.
+function renderScaleDrillBar() {
+  const s = scaleDrillState;
+  if (!s.active) return;
+  const seq = scalePractice.sequence;
+  const statuses = scalePractice.statuses;
+  const curIdx = scalePractice.currentIndex;
+  const nameArr = s.cofIndex <= 5 ? NOTE_NAMES_SHARP : NOTE_NAMES_FLAT;
+  const container = document.getElementById('drillBarChords');
+  if (!container) return;
+  container.innerHTML = '';
+  seq.forEach((midiNote, i) => {
+    const pc = midiNote % 12;
+    const box = document.createElement('div');
+    let cls = 'prog-chord-box';
+    if (statuses[i] === 'correct' || i < curIdx) cls += ' done';
+    else if (i === curIdx) cls += ' current';
+    if (statuses[i] === 'wrong') cls += ' wrong';
+    box.className = cls;
+    box.textContent = nameArr[pc];
+    container.appendChild(box);
+  });
+}
+
 function drillSyncKeySig(keyIndex) {
   const keySig = COF_KEYSIG_BY_POS[keyIndex];
   if (keySig && keySig !== state.keySig) {
@@ -7408,50 +7908,23 @@ function drillSyncKeySig(keyIndex) {
 function closeDrillPanel() {
   if (shellDrillState.active) closeShellDrill();
   else if (twoFiveOneDrillState.active) closeTwoFiveOneDrill();
+  else if (scaleDrillState.active) closeScaleDrill();
 }
 function drillPanelGoBack() {
   if (shellDrillState.active) shellGoBack();
   else if (twoFiveOneDrillState.active) twoFiveOneGoBack();
+  else if (scaleDrillState.active) scaleDrillGoBack();
 }
 function drillPanelPrev() {
   if (shellDrillState.active) shellPrevKey();
   else if (twoFiveOneDrillState.active) twoFiveOnePrevKey();
+  else if (scaleDrillState.active) scaleDrillPrevKey();
 }
 function drillPanelNext() {
   if (shellDrillState.active) shellNextKey();
   else if (twoFiveOneDrillState.active) twoFiveOneNextKey();
+  else if (scaleDrillState.active) scaleDrillNextKey();
 }
-
-// ============================================================
-// ============================================================
-let _activeDrillOverlayId = null;
-
-function positionDrillOverlay(overlayId) {
-  document.getElementById('cofPanel').style.visibility = ''; // clear any leftover
-  const row = document.querySelector('.staff-row');
-  const rect = row.getBoundingClientRect();
-  const overlay = document.getElementById(overlayId);
-  overlay.style.top    = rect.top  + 'px';
-  overlay.style.left   = rect.left + 'px';
-  overlay.style.width  = rect.width + 'px';
-  overlay.style.bottom = (window.innerHeight - rect.bottom) + 'px';
-  _activeDrillOverlayId = overlayId;
-}
-
-function restoreCofFromDrill() {
-  _activeDrillOverlayId = null;
-}
-
-window.addEventListener('resize', () => {
-  if (!_activeDrillOverlayId) return;
-  const row = document.querySelector('.staff-row');
-  const rect = row.getBoundingClientRect();
-  const overlay = document.getElementById(_activeDrillOverlayId);
-  overlay.style.top    = rect.top  + 'px';
-  overlay.style.left   = rect.left + 'px';
-  overlay.style.width  = rect.width + 'px';
-  overlay.style.bottom = (window.innerHeight - rect.bottom) + 'px';
-});
 
 // ============================================================
 // === EVENT LISTENERS ===
@@ -7472,6 +7945,17 @@ document.getElementById('ledModeSelect').addEventListener('change', (e) => {
     clearScaleMode();
   }
   roliUpdateHighlight();
+});
+
+document.getElementById('chordAnchorSelect').addEventListener('change', (e) => {
+  const v = e.target.value;
+  state.chordAnchorMode = (v === 'auto') ? 'auto' : 'fixed';
+  if (v !== 'auto') state.chordAnchorMidi = parseInt(v, 10);
+  // Re-light/redraw whichever drill is currently active so the change takes effect immediately.
+  if (invDrillState.active) invUpdateUI();
+  else if (triadDrillState.active) tcdUpdateUI();
+  else if (vlDrillState.active) vlUpdateUI();
+  else if (scaleDrillState.active) scaleDrillApply(); // rebuilds the scale sequence at the new octave, which also redraws the grand staff
 });
 
 document.getElementById('requestMidiBtn').addEventListener('click', () => {
@@ -7533,12 +8017,17 @@ document.getElementById('progSelectHeader').addEventListener('change', (e) => {
     openVlDrill();
     return;
   }
+  if (v === 'scale-drill') {
+    openScaleDrill();
+    return;
+  }
   if (noteTrainerState.active) closeNoteTrainer();
   if (triadDrillState.active) closeTriadDrill();
   if (invDrillState.active) closeInvDrill();
   if (vlDrillState.active) closeVlDrill();
   if (shellDrillState.active) closeShellDrill();
   if (twoFiveOneDrillState.active) closeTwoFiveOneDrill();
+  if (scaleDrillState.active) closeScaleDrill();
   if (!v) {
     closeProgression();
   } else if (v === '__manage__') {
@@ -7611,79 +8100,86 @@ document.getElementById('aboutOverlay').addEventListener('click', (e) => {
   if (e.target === e.currentTarget) e.target.classList.remove('show');
 });
 
-// --- Note Trainer controls ---
-document.getElementById('ntClose').addEventListener('click', closeNoteTrainer);
-document.getElementById('ntBack').addEventListener('click', ntGoBack);
+// --- Shared Drill Panel controls (Triad Circle, Inversion, Voice Leading, Note Trainer) ---
+// These four drills share one panel (#drillRefPanel) instead of separate full-screen
+// overlays, so a single set of Close/Back/Prev/Next handlers dispatches to whichever
+// drill currently owns it. Their settings controls are injected dynamically into
+// #drillPanelControls / #drillPanelBody, so those are handled via delegation below
+// rather than direct per-element listeners (the elements don't exist until opened).
+document.getElementById('drillPanelClose').addEventListener('click', drillRefPanelClose);
+document.getElementById('drillPanelBack').addEventListener('click', drillRefPanelBack);
+document.getElementById('drillPanelPrev').addEventListener('click', drillRefPanelPrevKey);
+document.getElementById('drillPanelNext').addEventListener('click', drillRefPanelNextKey);
 
-document.getElementById('ntSettingsBtn').addEventListener('click', () => {
-  const btn = document.getElementById('ntSettingsBtn');
-  const panel = document.getElementById('ntSettings');
+document.getElementById('drillPanelControls').addEventListener('click', (e) => {
+  const btn = e.target.closest('.nt-bar-btn');
+  if (!btn || !btn.id.endsWith('SettingsBtn')) return;
+  const panel = document.getElementById(btn.id.slice(0, -3)); // "xxSettingsBtn" -> "xxSettings"
+  if (!panel) return;
   const isOpen = panel.classList.toggle('show');
   btn.classList.toggle('active', isOpen);
 });
 
-document.getElementById('ntHintBtn').addEventListener('click', ntHandleHint);
-document.getElementById('ntSkipBtn').addEventListener('click', ntHandleSkip);
-
-document.getElementById('ntClefSel').addEventListener('change', (e) => {
-  noteTrainerState.settings.clef = e.target.value;
-  ntApplySettings();
-});
-document.getElementById('ntRangeSel').addEventListener('change', (e) => {
-  noteTrainerState.settings.range = Number(e.target.value);
-  ntApplySettings();
-});
-document.getElementById('ntAccSel').addEventListener('change', (e) => {
-  noteTrainerState.settings.accidentals = Number(e.target.value);
-  ntApplySettings();
-});
-
-// --- Triad Circle Drill controls ---
-document.getElementById('tcdClose').addEventListener('click', closeTriadDrill);
-document.getElementById('tcdBack').addEventListener('click', tcdGoBack);
-document.getElementById('tcdMode').addEventListener('change', (e) => {
-  triadDrillState.mode = e.target.value;
-  triadDrillState.currentIndex = 0;
-  triadDrillState.feedbackCorrect = false;
-  if (triadDrillState.feedbackTimer !== null) {
-    clearTimeout(triadDrillState.feedbackTimer);
-    triadDrillState.feedbackTimer = null;
+document.getElementById('drillPanelBody').addEventListener('change', (e) => {
+  const id = e.target.id;
+  if (id === 'tcdMode') {
+    triadDrillState.mode = e.target.value;
+    triadDrillState.currentIndex = 0;
+    triadDrillState.feedbackCorrect = false;
+    if (triadDrillState.feedbackTimer !== null) { clearTimeout(triadDrillState.feedbackTimer); triadDrillState.feedbackTimer = null; }
+    triadDrillState.sequence = buildTriadDrillSequence(triadDrillState.mode, triadDrillState.inversion);
+    tcdUpdateUI();
+  } else if (id === 'tcdInversion') {
+    triadDrillState.inversion = parseInt(e.target.value, 10);
+    triadDrillState.currentIndex = 0;
+    triadDrillState.feedbackCorrect = false;
+    if (triadDrillState.feedbackTimer !== null) { clearTimeout(triadDrillState.feedbackTimer); triadDrillState.feedbackTimer = null; }
+    triadDrillState.sequence = buildTriadDrillSequence(triadDrillState.mode, triadDrillState.inversion);
+    tcdUpdateUI();
+  } else if (id === 'invMode') {
+    invDrillState.mode = e.target.value;
+    invResetSequence();
+  } else if (id === 'invKey') {
+    invDrillState.key = e.target.value === 'all' ? 'all' : parseInt(e.target.value, 10);
+    invResetSequence();
+  } else if (id === 'invChordType') {
+    invDrillState.chordType = e.target.value;
+    invResetSequence();
+  } else if (id === 'vlStartKey') {
+    vlDrillState.startKey = e.target.value;
+    vlDrillState.currentIndex = 0;
+    vlDrillState.feedbackCorrect = false;
+    if (vlDrillState.feedbackTimer !== null) { clearTimeout(vlDrillState.feedbackTimer); vlDrillState.feedbackTimer = null; }
+    vlDrillState.sequence = buildVlSequence(vlDrillState.startKey);
+    vlUpdateUI();
+  } else if (id === 'ntClefSel') {
+    noteTrainerState.settings.clef = e.target.value;
+    ntApplySettings();
+  } else if (id === 'ntRangeSel') {
+    noteTrainerState.settings.range = Number(e.target.value);
+    ntApplySettings();
+  } else if (id === 'ntAccSel') {
+    noteTrainerState.settings.accidentals = Number(e.target.value);
+    ntApplySettings();
   }
-  triadDrillState.sequence = buildTriadDrillSequence(triadDrillState.mode);
-  tcdUpdateUI();
+});
+document.getElementById('drillPanelBody').addEventListener('click', (e) => {
+  if (e.target.id === 'ntHintBtn') ntHandleHint();
+  else if (e.target.id === 'ntSkipBtn') ntHandleSkip();
 });
 
-// --- Inversion Drill controls ---
-document.getElementById('invClose').addEventListener('click', closeInvDrill);
-document.getElementById('invBack').addEventListener('click', invGoBack);
-document.getElementById('invMode').addEventListener('change', (e) => {
-  invDrillState.mode = e.target.value;
+function invResetSequence() {
   invDrillState.currentIndex = 0;
   invDrillState.feedbackCorrect = false;
   if (invDrillState.feedbackTimer !== null) {
     clearTimeout(invDrillState.feedbackTimer);
     invDrillState.feedbackTimer = null;
   }
-  invDrillState.sequence = buildInvDrillSequence(invDrillState.mode);
+  invDrillState.sequence = buildInvDrillSequence(invDrillState.mode, invDrillState.key, invDrillState.chordType);
   invUpdateUI();
-});
+}
 
-// --- Voice Leading Drill controls ---
-document.getElementById('vlClose').addEventListener('click', closeVlDrill);
-document.getElementById('vlBack').addEventListener('click', vlGoBack);
-document.getElementById('vlStartKey').addEventListener('change', (e) => {
-  vlDrillState.startKey = e.target.value;
-  vlDrillState.currentIndex = 0;
-  vlDrillState.feedbackCorrect = false;
-  if (vlDrillState.feedbackTimer !== null) {
-    clearTimeout(vlDrillState.feedbackTimer);
-    vlDrillState.feedbackTimer = null;
-  }
-  vlDrillState.sequence = buildVlSequence(vlDrillState.startKey);
-  vlUpdateUI();
-});
-
-// --- Drill Bar controls (Shell Voicings + ii–V–I) ---
+// --- Drill Bar controls (Shell Voicings + ii–V–I + Scale Drill) ---
 document.getElementById('drillBarClose').addEventListener('click', closeDrillPanel);
 document.getElementById('drillBarBack').addEventListener('click', drillPanelGoBack);
 document.getElementById('drillBarPrev').addEventListener('click', drillPanelPrev);
@@ -7697,6 +8193,9 @@ document.getElementById('drillBarMode').addEventListener('change', (e) => {
     if (shellDrillState.feedbackTimer) { clearTimeout(shellDrillState.feedbackTimer); shellDrillState.feedbackTimer = null; }
     shellDrillState.sequence = buildShellSequence(shellDrillState.mode);
     renderShellDrill();
+  } else if (scaleDrillState.active) {
+    scaleDrillState.quality = e.target.value;
+    scaleDrillApply();
   }
 });
 
