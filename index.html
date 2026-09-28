@@ -1911,6 +1911,7 @@ html, body {
       <div class="status-dot" id="statusDot"></div>
       <span id="statusText">No MIDI Device</span>
     </div>
+    <button class="about-btn" id="midiRefreshBtn" style="margin-right:6px;">↻ Refresh MIDI</button>
     <button class="about-btn" id="midiDebugBtn" style="margin-right:6px;">Debug</button>
     <button class="about-btn" id="aboutBtn">About</button>
   </div>
@@ -4463,6 +4464,17 @@ async function initMIDI() {
   state.midiAccess.onstatechange = () => updateMIDIDeviceList();
   updateMIDIDeviceList();
   document.getElementById('requestMidiBtn').style.display = 'none';
+
+  // Some iOS Bluetooth-MIDI bridges populate ports asynchronously, shortly
+  // AFTER requestMIDIAccess() resolves, without reliably firing onstatechange
+  // for the very first device. Re-check a few times over ~8s as a safety net.
+  const recheckDelays = [500, 1000, 2000, 3500, 5500, 8000];
+  for (const delay of recheckDelays) {
+    setTimeout(() => {
+      if (state.selectedInput) return; // already found one, stop bothering
+      updateMIDIDeviceList();
+    }, delay);
+  }
 }
 
 // ============================================================
@@ -8034,6 +8046,14 @@ document.getElementById('chordAnchorSelect').addEventListener('change', (e) => {
 
 document.getElementById('requestMidiBtn').addEventListener('click', () => {
   initMIDI();
+});
+
+document.getElementById('midiRefreshBtn').addEventListener('click', () => {
+  if (!state.midiAccess) {
+    initMIDI();
+  } else {
+    updateMIDIDeviceList();
+  }
 });
 
 document.getElementById('midiDebugBtn').addEventListener('click', () => {
