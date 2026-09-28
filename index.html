@@ -1911,8 +1911,17 @@ html, body {
       <div class="status-dot" id="statusDot"></div>
       <span id="statusText">No MIDI Device</span>
     </div>
+    <button class="about-btn" id="midiDebugBtn" style="margin-right:6px;">Debug</button>
     <button class="about-btn" id="aboutBtn">About</button>
   </div>
+</div>
+
+<div id="midiDebugPanel" style="display:none; position:fixed; top:60px; right:10px; z-index:9999; width:340px; max-width:88vw; max-height:70vh; overflow:auto; background:#111; color:#7CFC7C; font:11px/1.5 -apple-system, Menlo, monospace; padding:10px; border-radius:8px; box-shadow:0 4px 20px rgba(0,0,0,.5); white-space:pre-wrap;">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+    <strong style="color:#fff;">MIDI Debug</strong>
+    <button id="midiDebugCloseBtn" style="background:none;border:none;color:#fff;font-size:16px;line-height:1;cursor:pointer;padding:2px 6px;">&times;</button>
+  </div>
+  <div id="midiDebugContent">No data yet.</div>
 </div>
 
 <!-- MAIN -->
@@ -2940,6 +2949,15 @@ function renderStaff() {
     }
   }
 
+  // Draw notes
+  const noteX = leftMargin + 50 + keySigWidth + 40;
+  const allNotes = getAllActiveNotes();
+  
+  // Separate into treble and bass: middle C (60) and below -> bass, above -> treble
+  // But place C4 (60) on bass staff with ledger line
+  const trebleNotes = allNotes.filter(n => n > 60);
+  const bassNotes = allNotes.filter(n => n <= 60);
+
   // Y position for a staff position
   function staffPosToY(staffPos, clef) {
     // staffPos: 0 = middle C
@@ -2957,10 +2975,8 @@ function renderStaff() {
     }
   }
 
-  function drawChordStack(midiNotes, baseX, clef, alpha = 1) {
+  function drawChordStack(midiNotes, baseX, clef) {
     if (midiNotes.length === 0) return;
-    ctx.save();
-    if (alpha < 1) ctx.globalAlpha = Math.max(0, alpha);
 
     const r = lineSpacing * 0.48;
     const sorted = [...midiNotes].sort((a, b) => a - b);
@@ -3128,7 +3144,6 @@ function renderStaff() {
         ctx.fillText(noteNameFromMidi(nd.midi), labelX, nd.y);
       }
     }
-    ctx.restore();
   }
 
   const var_notehead = '#F5F5F7';
@@ -3275,53 +3290,15 @@ function renderStaff() {
     // (scale mode rendered)
   } else {
 
-  // === NOTE HISTORY MODE ===
-  // Instead of only showing the currently-held chord, the staff depicts a
-  // scrolling trail of the last notes/chords played (see noteHistoryState).
-  // Newest note/chord sits at the right edge; each new one shifts everything
-  // else one slot left. Everything is drawn as quarter notes for simplicity.
-  const histStartX = leftMargin + 50 + keySigWidth + 40;
-  const histEndX = rightMargin - 20;
-  const slotWidth = (histEndX - histStartX) / Math.max(NOTE_HISTORY_VISIBLE_SLOTS - 1, 1);
+  // === NORMAL CHORD MODE ===
+  // Position chords: center treble and bass stacks
+  const trebleSorted = [...trebleNotes].sort((a, b) => a - b);
+  const bassSorted = [...bassNotes].sort((a, b) => a - b);
 
-  let stillMoving = false;
+  const chordCenterX = leftMargin + 50 + keySigWidth + 60;
 
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(histStartX, 0, Math.max(0, w - histStartX), h);
-  ctx.clip(); // notes visually disappear once they scroll past the left edge
-
-  for (const ev of noteHistoryState.events) {
-    const targetX = histEndX - ev.slotIndex * slotWidth;
-    if (ev.x === null) {
-      // Brand new note: spawn just off the right edge and ease into place
-      ev.x = ev.slotIndex === 0 ? histEndX + slotWidth * 0.6 : targetX;
-    }
-    const delta = targetX - ev.x;
-    if (Math.abs(delta) > slotWidth * 1.5) {
-      // Large jump (e.g. panel resize) — snap instead of animating
-      ev.x = targetX;
-    } else {
-      ev.x += delta * NOTE_HISTORY_EASE;
-      if (Math.abs(targetX - ev.x) > 0.4) stillMoving = true;
-      else ev.x = targetX;
-    }
-
-    // Fade out as a note approaches the left edge of the lane
-    const fadeStart = histStartX + slotWidth * 3;
-    let alpha = 1;
-    if (ev.x < fadeStart) {
-      alpha = Math.max(0, (ev.x - histStartX) / (fadeStart - histStartX));
-    }
-    if (alpha <= 0.02) continue;
-
-    const trebleN = ev.notes.filter(n => n > 60);
-    const bassN = ev.notes.filter(n => n <= 60);
-    if (bassN.length)   drawChordStack(bassN, ev.x, 'bass', alpha);
-    if (trebleN.length) drawChordStack(trebleN, ev.x, 'treble', alpha);
-  }
-  ctx.restore();
-  noteHistoryState.stillMoving = stillMoving;
+  drawChordStack(bassSorted, chordCenterX, 'bass');
+  drawChordStack(trebleSorted, chordCenterX, 'treble');
   }
 }
 
@@ -4177,80 +4154,9 @@ function scheduleChordUpdate() {
   }, 20);
 }
 
-// ============================================================
-// === NOTE HISTORY (scrolling staff trail) ===
-// ============================================================
-// Every note-on played (MIDI, click, or touch — anything that goes through
-// onNoteOn) is recorded here. Notes that arrive within a short window of
-// each other are grouped into a single "chord" event so a chord scrolls by
-// as one stacked quarter-note event, same as a single melodic note would.
-const NOTE_HISTORY_VISIBLE_SLOTS = 25; // notes comfortably spaced across the staff
-const NOTE_HISTORY_MAX_BUFFER = 30;    // hard cap kept in memory/animation
-const NOTE_HISTORY_GROUP_WINDOW_MS = 70;
-const NOTE_HISTORY_EASE = 0.22;
-
-const noteHistoryState = {
-  events: [],          // { id, notes:[midi,...], slotIndex, x, stillMoving }
-  nextId: 1,
-  pendingGroup: null,  // { notes:Set, firstOnset, timer }
-  animRunning: false,
-  stillMoving: false,
-};
-
-function noteHistoryRecordNoteOn(midi) {
-  const now = Date.now();
-  const pending = noteHistoryState.pendingGroup;
-  if (pending && (now - pending.firstOnset) < NOTE_HISTORY_GROUP_WINDOW_MS) {
-    pending.notes.add(midi);
-    return;
-  }
-  if (pending) {
-    // Window already elapsed but the timer hasn't fired yet — finalize now.
-    clearTimeout(pending.timer);
-    noteHistoryCommitGroup(pending);
-  }
-  const group = { notes: new Set([midi]), firstOnset: now, timer: null };
-  group.timer = setTimeout(() => noteHistoryCommitGroup(group), NOTE_HISTORY_GROUP_WINDOW_MS);
-  noteHistoryState.pendingGroup = group;
-}
-
-function noteHistoryCommitGroup(group) {
-  if (noteHistoryState.pendingGroup === group) noteHistoryState.pendingGroup = null;
-  const notes = [...group.notes].sort((a, b) => a - b);
-  if (!notes.length) return;
-
-  for (const ev of noteHistoryState.events) ev.slotIndex++;
-  noteHistoryState.events.push({
-    id: noteHistoryState.nextId++,
-    notes,
-    slotIndex: 0,
-    x: null,
-  });
-  while (noteHistoryState.events.length > NOTE_HISTORY_MAX_BUFFER) noteHistoryState.events.shift();
-
-  noteHistoryStartAnim();
-  renderStaff();
-}
-
-function noteHistoryStartAnim() {
-  if (noteHistoryState.animRunning) return;
-  noteHistoryState.animRunning = true;
-  requestAnimationFrame(noteHistoryAnimTick);
-}
-
-function noteHistoryAnimTick() {
-  renderStaff(); // updates ev.x toward target and sets noteHistoryState.stillMoving
-  if (noteHistoryState.stillMoving) {
-    requestAnimationFrame(noteHistoryAnimTick);
-  } else {
-    noteHistoryState.animRunning = false;
-  }
-}
-
 function onNoteOn(note, velocity) {
   state.activeNotes.set(note, { velocity, timestamp: Date.now() });
   state.lastPlayedNote = note;
-  noteHistoryRecordNoteOn(note);
   noteOn(note, velocity);
   // Run drill checks without early-returning — staff and chord panel always update
   if (noteTrainerState.active) ntHandleNoteOn(note);
@@ -4346,13 +4252,66 @@ function handleMIDIMessage(e) {
   }
 }
 
+function getPortList(portMapLike) {
+  if (!portMapLike) return [];
+  try {
+    if (typeof portMapLike.values === 'function') {
+      return Array.from(portMapLike.values());
+    }
+  } catch (e) {}
+  try {
+    if (typeof portMapLike.forEach === 'function') {
+      const arr = [];
+      portMapLike.forEach((p) => arr.push(p));
+      return arr;
+    }
+  } catch (e) {}
+  if (Array.isArray(portMapLike)) return portMapLike;
+  try {
+    return Object.values(portMapLike);
+  } catch (e) {
+    return [];
+  }
+}
+
+function renderMidiDebug(extra) {
+  const el = document.getElementById('midiDebugContent');
+  if (!el) return;
+  const lines = [];
+  lines.push('requestMIDIAccess: ' + (typeof navigator.requestMIDIAccess));
+  lines.push('sysexEnabled: ' + state.sysexEnabled);
+  lines.push('midiAccess set: ' + !!state.midiAccess);
+  if (state.midiAccess) {
+    const ins = state.midiAccess.inputs;
+    const outs = state.midiAccess.outputs;
+    const inCtor = ins && ins.constructor ? ins.constructor.name : 'n/a';
+    const outCtor = outs && outs.constructor ? outs.constructor.name : 'n/a';
+    lines.push('inputs: typeof=' + typeof ins + ' ctor=' + inCtor);
+    lines.push('  has .values()=' + (ins && typeof ins.values === 'function'));
+    lines.push('  has .forEach()=' + (ins && typeof ins.forEach === 'function'));
+    lines.push('  isArray=' + Array.isArray(ins));
+    lines.push('outputs: typeof=' + typeof outs + ' ctor=' + outCtor);
+    const inList = getPortList(ins);
+    const outList = getPortList(outs);
+    lines.push('input ports found: ' + inList.length);
+    inList.forEach((p, i) => lines.push('  [' + i + '] name=' + p.name + ' id=' + p.id + ' state=' + p.state + ' conn=' + p.connection));
+    lines.push('output ports found: ' + outList.length);
+    outList.forEach((p, i) => lines.push('  [' + i + '] name=' + p.name + ' id=' + p.id + ' state=' + p.state + ' conn=' + p.connection));
+  }
+  if (extra) lines.push('--- ' + extra);
+  el.textContent = lines.join('\n');
+}
+
 function updateMIDIDeviceList() {
   const select = document.getElementById('midiSelect');
   select.innerHTML = '<option value="">— Select MIDI Device —</option>';
   if (!state.midiAccess) return;
 
   let hasDevice = false;
-  for (const input of state.midiAccess.inputs.values()) {
+  let debugError = null;
+  try {
+  const inputList = getPortList(state.midiAccess.inputs);
+  for (const input of inputList) {
     const opt = document.createElement('option');
     opt.value = input.id;
     opt.textContent = input.name || input.id;
@@ -4373,7 +4332,8 @@ function updateMIDIDeviceList() {
   if (outSelect) {
     outSelect.innerHTML = '<option value="">— None —</option>';
     let preferredId = null;
-    for (const out of state.midiAccess.outputs.values()) {
+    const outputList = getPortList(state.midiAccess.outputs);
+    for (const out of outputList) {
       const opt = document.createElement('option');
       opt.value = out.id;
       opt.textContent = out.name || out.id;
@@ -4389,13 +4349,24 @@ function updateMIDIDeviceList() {
       selectMIDIOutput(preferredId);
     } else if (state.selectedOutput) {
       // Restore selection if device still present
-      const stillThere = state.midiAccess.outputs.get(state.selectedOutput.id);
+      const stillThere = getPortById(state.midiAccess.outputs, state.selectedOutput.id);
       if (stillThere) {
         outSelect.value = state.selectedOutput.id;
       } else {
         state.selectedOutput = null;
       }
     }
+  }
+  } catch (err) {
+    debugError = (err && err.message) ? err.message : String(err);
+    console.warn('updateMIDIDeviceList error:', err);
+    updateStatus('no-device');
+  }
+
+  renderMidiDebug(debugError ? ('ERROR: ' + debugError) : null);
+  const debugPanelEl = document.getElementById('midiDebugPanel');
+  if (debugPanelEl && (debugError || !hasDevice)) {
+    debugPanelEl.style.display = 'block';
   }
 }
 
@@ -4408,7 +4379,7 @@ function selectMIDIInput(id) {
 
   if (!id || !state.midiAccess) return;
 
-  const input = state.midiAccess.inputs.get(id);
+  const input = getPortById(state.midiAccess.inputs, id);
   if (input) {
     input.onmidimessage = handleMIDIMessage;
     state.selectedInput = input;
@@ -4417,12 +4388,12 @@ function selectMIDIInput(id) {
     // Auto-bind LED output: find a matching output by name (same physical device)
     if (state.sysexEnabled) {
       let matchedOut = null;
-      for (const out of state.midiAccess.outputs.values()) {
+      for (const out of getPortList(state.midiAccess.outputs)) {
         if (out.name === input.name) { matchedOut = out; break; }
       }
       // Fallback: any output matching roli/lumi/piano pattern
       if (!matchedOut) {
-        for (const out of state.midiAccess.outputs.values()) {
+        for (const out of getPortList(state.midiAccess.outputs)) {
           if (/(lumi|roli|piano|seaboard)/i.test(out.name || '')) { matchedOut = out; break; }
         }
       }
@@ -4441,7 +4412,7 @@ function selectMIDIOutput(id) {
     roliUpdateHighlight();
     return;
   }
-  const out = state.midiAccess.outputs.get(id);
+  const out = getPortById(state.midiAccess.outputs, id);
   if (out) {
     state.selectedOutput = out;
     // Push current state to the newly-connected Roli
@@ -8063,6 +8034,17 @@ document.getElementById('chordAnchorSelect').addEventListener('change', (e) => {
 
 document.getElementById('requestMidiBtn').addEventListener('click', () => {
   initMIDI();
+});
+
+document.getElementById('midiDebugBtn').addEventListener('click', () => {
+  const panel = document.getElementById('midiDebugPanel');
+  const isHidden = !panel.style.display || panel.style.display === 'none';
+  if (isHidden) renderMidiDebug();
+  panel.style.display = isHidden ? 'block' : 'none';
+});
+
+document.getElementById('midiDebugCloseBtn').addEventListener('click', () => {
+  document.getElementById('midiDebugPanel').style.display = 'none';
 });
 
 document.getElementById('volumeSlider').addEventListener('input', (e) => {
