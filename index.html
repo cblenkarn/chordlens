@@ -4275,6 +4275,18 @@ function getPortList(portMapLike) {
   }
 }
 
+function getPortById(portMapLike, id) {
+  if (!portMapLike || !id) return null;
+  try {
+    if (typeof portMapLike.get === 'function') {
+      const found = portMapLike.get(id);
+      if (found) return found;
+    }
+  } catch (e) {}
+  const list = getPortList(portMapLike);
+  return list.find((p) => p && p.id === id) || null;
+}
+
 function renderMidiDebug(extra) {
   const el = document.getElementById('midiDebugContent');
   if (!el) return;
